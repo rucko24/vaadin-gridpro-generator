@@ -104,7 +104,6 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
         floatingSpan.getStyle().set("position", "absolute");
         floatingSpan.getStyle().set("transform", "translate(-50%, -50%)");
         floatingSpan.getStyle().set("z-index", "1");
-        floatingSpan.getStyle().set("background-color", "red");
         floatingSpan.addClassName("loader");
         floatingSpan.setVisible(false);
         UI.getCurrent().add(floatingSpan);

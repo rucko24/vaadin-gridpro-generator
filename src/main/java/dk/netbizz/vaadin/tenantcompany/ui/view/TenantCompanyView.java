@@ -190,7 +190,7 @@ public class TenantCompanyView extends Main implements Signal {
 
             ApplicationUser applicationUser = ServiceAccessPoint.getServiceAccessPointInstance().getTenantDepartmentEmployeeRepository().findById(applicatioUserIdField.getValue()).orElse(null);
             if (applicationUser != null) {
-                var singleThread = Executors.newSingleThreadExecutor();
+                var singleThread = Executors.newVirtualThreadPerTaskExecutor();
                 CompletableFuture.supplyAsync(() -> {
                             System.out.println("Generating items ...");
                             this.execute(() -> {
