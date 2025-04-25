@@ -1073,6 +1073,11 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
         public void executeFetch() {
 
             this.execute(() -> {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
                 List items = view.loadEntities();
                 // System.out.println("Fetched " + items.size() + " rows");
 
@@ -1081,9 +1086,11 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
                     view.genericGrid.recalculateColumnWidths();
                     view.genericGrid.removeClassName("dimmer");
                     view.floatingSpan.setVisible(false);
+                    UI.getCurrent().remove(view.floatingSpan);
                 });
             });
         }
+
     }
 
     private static class FeederThreadFys extends Thread {
