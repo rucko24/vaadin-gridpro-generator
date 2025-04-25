@@ -1086,7 +1086,6 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
                     view.genericGrid.recalculateColumnWidths();
                     view.genericGrid.removeClassName("dimmer");
                     view.floatingSpan.setVisible(false);
-                    UI.getCurrent().remove(view.floatingSpan);
                 });
             });
         }
