@@ -3,13 +3,16 @@ package dk.netbizz.vaadin.tenantcompany.ui.view;
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.details.Details;
 import com.vaadin.flow.component.html.Main;
+import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.router.Menu;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.vaadin.flow.server.Command;
 import dk.netbizz.vaadin.MainLayout;
 import dk.netbizz.vaadin.gridpro.utils.components.StandardNotifications;
 import dk.netbizz.vaadin.item.domain.Item;
@@ -28,9 +31,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.Executors;
 
-import static java.lang.Math.*;
+import static java.lang.Math.min;
 import static java.lang.Math.random;
+import static java.lang.Math.round;
 
 // https://docs.spring.io/spring-data/jdbc/docs/2.4.15/reference/html/
 // https://docs.spring.io/spring-framework/docs/4.3.25.RELEASE/spring-framework-reference/html/jdbc.html
@@ -50,6 +57,7 @@ public class TenantCompanyView extends Main implements Signal {
     Button genItemsButton = new Button("Generate 100 items for first 1000 users ");
     Button genItems10000Button = new Button("Generate 10000 items for user with id: ");
     IntegerField applicatioUserIdField = new IntegerField("Enter Employee id");
+    private final ProgressBar progressBar = new ProgressBar();
 
 
     VerticalLayout verticalLayout = new VerticalLayout();
@@ -78,6 +86,7 @@ public class TenantCompanyView extends Main implements Signal {
     private void buildUI() {
         HorizontalLayout horizontalLayout = new HorizontalLayout(genDepartmentsButton, genEmployeesButton, genItemsButton, genItems10000Button, applicatioUserIdField);
         horizontalLayout.setAlignItems(FlexComponent.Alignment.BASELINE);
+        verticalLayout.add(this.progressBar);
         verticalLayout.add(horizontalLayout);
         verticalLayout.add(tenantCompanyGrid);
         employeeDetails.add(tenantDepartmentEmployeeGrid);
@@ -164,7 +173,7 @@ public class TenantCompanyView extends Main implements Signal {
             System.out.println("Generating items ...");
             List<ApplicationUser> applicationUserList = ServiceAccessPoint.getServiceAccessPointInstance().getTenantDepartmentEmployeeRepository().findFirst1000();
             for (ApplicationUser applicationUser : applicationUserList) {
-                for(int i = 0; i < 100; i++) {
+                for (int i = 0; i < 100; i++) {
                     Item item = createItem(faker, applicationUser);
                     ServiceAccessPoint.getServiceAccessPointInstance().getItemRepository().save(item);
                 }
@@ -172,22 +181,45 @@ public class TenantCompanyView extends Main implements Signal {
             System.out.println("Finished generating items");
         });
 
+        progressBar.setIndeterminate(true);
+        progressBar.setWidthFull();
+        progressBar.setVisible(false);
         genItems10000Button.addClickListener(evt -> {
             Faker faker = new Faker();
             Random rand = new Random();
 
             ApplicationUser applicationUser = ServiceAccessPoint.getServiceAccessPointInstance().getTenantDepartmentEmployeeRepository().findById(applicatioUserIdField.getValue()).orElse(null);
             if (applicationUser != null) {
-                System.out.println("Generating items ...");
-                for(int i = 0; i < 10000; i++) {
-                    Item item = createItem(faker, applicationUser);
-                    ServiceAccessPoint.getServiceAccessPointInstance().getItemRepository().save(item);
-                }
-                System.out.println("Finished generating items");
+                var singleThread = Executors.newSingleThreadExecutor();
+                CompletableFuture.supplyAsync(() -> {
+                            System.out.println("Generating items ...");
+                            this.execute(() -> {
+                                Notification.show("Generating items ...");
+                                progressBar.setVisible(true);
+                            });
+                            final List<Item> list = new CopyOnWriteArrayList<>();
+                            for (int i = 0; i < 10000; i++) {
+                                list.add(createItem(faker, applicationUser));
+                            }
+                            return list;
+                        }, singleThread)
+                        .whenCompleteAsync((data, throwable) -> {
+                            this.execute(() -> {
+                                data.forEach(item -> ServiceAccessPoint.getServiceAccessPointInstance().getItemRepository().save(item));
+                                Notification.show("Finished generating items {size}: " + data.size());
+                                System.out.println("Finished generating items");
+                                progressBar.setVisible(false);
+                            });
+                        }, singleThread);
+
             } else {
                 StandardNotifications.showTempWarningNotification("No user found with id: " + applicatioUserIdField.getValue());
             }
         });
+    }
+
+    private void execute(Command command) {
+        super.getUI().ifPresent(ui -> ui.access(command));
     }
 
 
@@ -215,31 +247,29 @@ public class TenantCompanyView extends Main implements Signal {
         item.setActive(true);
         item.setCriticality(criticalList.get(rand.nextInt(3)));
         item.setDescription(description.concat("<p><h3>" + faker.famousLastWords().lastWords() + " - " + faker.funnyName().name()) + "</h3></p>");
-        Integer[] yearlyAmount =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        Integer[] yearlyAmount = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         for (int j = 0; j < yearlyAmount.length; j++) {
             yearlyAmount[j] = rand.nextInt(10000);
         }
         item.setYearlyAmount(yearlyAmount);
 
-        Integer[] impactAmount =  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        Integer[] impactAmount = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         for (int j = 0; j < impactAmount.length; j++) {
             impactAmount[j] = rand.nextInt(1000);
         }
         item.setImpactAmount(impactAmount);
 
-        BigDecimal[] likelyhood =  {BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0)};
+        BigDecimal[] likelyhood = {BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0), BigDecimal.valueOf(0)};
         for (int j = 0; j < likelyhood.length; j++) {
-            likelyhood[j] = BigDecimal.valueOf(random()*14.0);
+            likelyhood[j] = BigDecimal.valueOf(random() * 14.0);
         }
         item.setLikelihood(likelyhood);
 
         return item;
     }
 
-
-    // See https://vaadin.com/docs/latest/flow/advanced/server-push  Broadcaster
     public void signal(String signalEvent, Object signal) {
-        switch(signalEvent.toLowerCase()) {
+        switch (signalEvent.toLowerCase()) {
             case "companyselected" -> {
                 if (signal != null) {
                     departmentDetails.setSummaryText("Departments of " + ((TenantCompany) signal).getCompanyName());

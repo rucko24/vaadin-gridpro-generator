@@ -88,7 +88,6 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
     private final Button btnAdd = new Button();
     protected Span floatingSpan = new Span();
 
-
     protected GenericGridProEditView(Class<T> entityClass) {
         this.entityClass = entityClass;
         this.genericGrid = new GridPro<>(entityClass);
@@ -105,9 +104,10 @@ public abstract class GenericGridProEditView<T extends BaseEntity> extends Verti
         floatingSpan.getStyle().set("position", "absolute");
         floatingSpan.getStyle().set("transform", "translate(-50%, -50%)");
         floatingSpan.getStyle().set("z-index", "1");
+        floatingSpan.getStyle().set("background-color", "red");
         floatingSpan.addClassName("loader");
         floatingSpan.setVisible(false);
-        add(floatingSpan);
+        UI.getCurrent().add(floatingSpan);
         add(genericGrid);
     }
 
